@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+results/
+swarm_report*.md
+bench*.json
+.env

@@ -1,0 +1,2 @@
+# Клиентские скрипты (bench_swarm.py, swarm_demo.py). Сам vLLM ставится отдельно — см. docs/04-zapusk.md
+httpx>=0.27
