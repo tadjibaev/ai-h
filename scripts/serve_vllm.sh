@@ -3,15 +3,15 @@
 #
 #   ./scripts/serve_vllm.sh <профиль> [дополнительные флаги vllm serve ...]
 #
-# Профили (ёмкость — оценка scripts/vram_calc.py, точная цифра будет в логе vLLM при старте):
-#   h200        1× H200 141GB              FP8 веса + FP8 KV   ≈ 11 агентов × 256K
-#   b200        1× B200 180GB              FP8 веса + FP8 KV   ≈ 15 агентов × 256K
-#   2xh100      2× H100 80GB (TP=2)        FP8 веса + FP8 KV   ≈ 13 агентов × 256K
-#   2xpro6000   2× RTX PRO 6000 96GB (TP=2) FP8 веса + FP8 KV  ≈ 16 агентов × 256K
-#   pro6000     1× RTX PRO 6000 96GB       NVFP4 + FP8 KV      ≈ 7 агентов × 256K (или 10 × ~190K)
-#   h100        1× H100 80GB               FP8 веса + FP8 KV   ≈ 4 агента × 256K (или 10 × ~120K)
-#   2x5090      2× RTX 5090 32GB (TP=2)    NVFP4 + FP8 KV      ≈ 3–4 агента × 256K (или 10 × ~90K)
-#   5090        1× RTX 5090 32GB           NVFP4 + FP8 KV      контекст 32K — только для экспериментов
+# Профили (ёмкость — оценка scripts/vram_calc.py с MTP; точная цифра будет в логе vLLM при старте):
+#   h200        1× H200 141GB               FP8 веса + FP8 KV   ≈ 10 агентов × 256K (впритык)
+#   b200        1× B200 180GB               FP8 веса + FP8 KV   ≈ 14 агентов × 256K
+#   2xh100      2× H100 80GB (TP=2)         FP8 веса + FP8 KV   ≈ 12 агентов × 256K
+#   2xpro6000   2× RTX PRO 6000 96GB (TP=2) FP8 веса + FP8 KV   ≈ 15 агентов × 256K
+#   pro6000     1× RTX PRO 6000 96GB        NVFP4 + FP8 KV      ≈ 7 агентов × 256K (или 10 × ~180K)
+#   h100        1× H100 80GB                FP8 веса + FP8 KV   ≈ 4 агента × 256K (или 10 × ~110K)
+#   2x5090      2× RTX 5090 32GB (TP=2)     NVFP4 + FP8 KV      ≈ 3 агента × 256K (или 10 × ~85K)
+#   5090        1× RTX 5090 32GB            NVFP4 + FP8 KV      контекст 32K — только для экспериментов
 #
 # Переменные окружения (все необязательные):
 #   PORT=8000            порт API
@@ -22,7 +22,7 @@
 #   MODEL=...            свой чекпойнт вместо профильного
 #   SERVED_NAME=qwen3.8-27b  имя модели в API
 #   DOCKER=1             запустить в docker-образе (иначе — локально установленный vllm)
-#   IMAGE=vllm/vllm-openai:v0.30.0   образ для DOCKER=1
+#   IMAGE=vllm/vllm-openai:v0.30.0   образ для DOCKER=1 (если не стартует — vllm/vllm-openai:qwen38 из рецепта)
 #   DRY_RUN=1            только напечатать команду
 set -euo pipefail
 
@@ -49,14 +49,14 @@ case "$PROFILE" in
   b200)       M=Qwen/Qwen3.8-27B-FP8; BATCHED=16384 ;;
   h100)       M=Qwen/Qwen3.8-27B-FP8 ;;
   2xh100)     M=Qwen/Qwen3.8-27B-FP8; TP=2; BATCHED=16384 ;;
-  2xpro6000)  M=Qwen/Qwen3.8-27B-FP8; TP=2
-              # из рецепта vLLM для RTX PRO 6000 (sm120): блочный FP8 без DeepGEMM
-              ENVS+=(VLLM_USE_DEEP_GEMM=0) ;;
-  pro6000)    M=nvidia/Qwen3.8-27B-NVFP4 ;;
-  2x5090)     M=nvidia/Qwen3.8-27B-NVFP4; TP=2; UTIL=0.93 ;;
+  # RTX PRO 6000 / RTX 5090 (sm120): внимание через FlashInfer. В замерах без него декод
+  # на контексте 128K падал с ~88 до ~32 ток/с.
+  2xpro6000)  M=Qwen/Qwen3.8-27B-FP8; TP=2; EXTRA+=(--attention-backend flashinfer) ;;
+  pro6000)    M=nvidia/Qwen3.8-27B-NVFP4; EXTRA+=(--attention-backend flashinfer) ;;
+  2x5090)     M=nvidia/Qwen3.8-27B-NVFP4; TP=2; UTIL=0.93; EXTRA+=(--attention-backend flashinfer) ;;
   5090)       M=nvidia/Qwen3.8-27B-NVFP4; CTX=32768; UTIL=0.93; SEQS=8
               # на одной 32-ГБ карте CUDA-графы не помещаются (см. рецепт vLLM)
-              EXTRA+=(--enforce-eager) ;;
+              EXTRA+=(--attention-backend flashinfer --enforce-eager) ;;
   *) echo "Неизвестный профиль: $PROFILE (см. --help)"; exit 1 ;;
 esac
 

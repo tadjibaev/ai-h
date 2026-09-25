@@ -128,12 +128,12 @@ async def chat_stream(client, cfg, messages, max_tokens):
         body["ignore_eos"] = True  # vLLM/SGLang: генерировать ровно max_tokens
     if cfg.thinking == "off":
         body["chat_template_kwargs"] = {"enable_thinking": False}
-    elif cfg.thinking in ("low", "medium", "high", "xhigh"):
-        body["chat_template_kwargs"] = {"reasoning_effort": cfg.thinking}
+    elif cfg.thinking in ("low", "medium", "xhigh"):
+        body["chat_template_kwargs"] = {"reasoning_effort": cfg.thinking}  # только Qwen3.8
 
     t0 = time.perf_counter()
     t_first = None
-    text, usage = [], {}
+    text, thoughts, usage = [], [], {}
     async with client.stream("POST", f"{cfg.base_url}/chat/completions", json=body) as r:
         if r.status_code != 200:
             err = (await r.aread()).decode(errors="replace")[:300]
@@ -154,6 +154,7 @@ async def chat_stream(client, cfg, messages, max_tokens):
                 if (piece or thought) and t_first is None:
                     t_first = time.perf_counter()
                 text.append(piece)
+                thoughts.append(thought)
     t_end = time.perf_counter()
     t_first = t_first or t_end
     completion = usage.get("completion_tokens") or 0
@@ -167,6 +168,7 @@ async def chat_stream(client, cfg, messages, max_tokens):
         "completion_tokens": completion,
         "decode_tps": (completion - 1) / decode_time if completion > 1 and decode_time > 0 else None,
         "text": "".join(text),
+        "reasoning": "".join(thoughts),
     }
 
 
@@ -191,7 +193,13 @@ async def run_agent(idx, client, cfg, shared_prefix, results, scale):
         print(f"  агент {idx:>2} ход {turn}: prompt={r['prompt_tokens']} "
               f"cached={r['cached_tokens']} TTFT={r['ttft']:.2f}s "
               f"декод={r['decode_tps'] or 0:.1f} ток/с", flush=True)
-        messages.append({"role": "assistant", "content": r.pop("text") or "ok"})
+        # Рассуждения возвращаем в историю: шаблон Qwen3.8 по умолчанию их сохраняет
+        # (preserve_thinking), иначе в истории окажутся пустые <think>-блоки.
+        assistant = {"role": "assistant", "content": r.pop("text") or "ok"}
+        reasoning = r.pop("reasoning")
+        if reasoning:
+            assistant["reasoning_content"] = reasoning
+        messages.append(assistant)
         messages.append({"role": "user", "content": (
             f"Tool result:\n{make_text(int(cfg.turn_tokens / scale), rng)}\n\nContinue the task.")})
 
@@ -254,8 +262,9 @@ async def main():
     p.add_argument("--turns", type=int, default=3, help="ходов у каждого агента")
     p.add_argument("--turn-tokens", type=int, default=2000, help="новых токенов на каждом ходу")
     p.add_argument("--output-tokens", type=int, default=256, help="токенов ответа на ход")
-    p.add_argument("--thinking", default="off", choices=["off", "on", "low", "medium", "high", "xhigh"],
-                   help="режим размышлений Qwen (off — предсказуемое время)")
+    p.add_argument("--thinking", default="off", choices=["off", "on", "low", "medium", "xhigh"],
+                   help="размышления: off — предсказуемое время; on — по умолчанию шаблона; "
+                        "low/medium/xhigh — reasoning_effort (только Qwen3.8)")
     p.add_argument("--temperature", type=float, default=0.7)
     p.add_argument("--no-ignore-eos", dest="ignore_eos", action="store_false",
                    help="не заставлять генерировать ровно --output-tokens")

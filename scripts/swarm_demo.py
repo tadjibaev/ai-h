@@ -106,8 +106,8 @@ class LLM:
             body["temperature"] = self.cfg.temperature
         if self.cfg.thinking == "off":
             body["chat_template_kwargs"] = {"enable_thinking": False}
-        elif self.cfg.thinking in ("low", "medium", "high", "xhigh"):
-            body["chat_template_kwargs"] = {"reasoning_effort": self.cfg.thinking}
+        elif self.cfg.thinking in ("low", "medium", "xhigh"):
+            body["chat_template_kwargs"] = {"reasoning_effort": self.cfg.thinking}  # только Qwen3.8
         for attempt in range(retries):
             try:
                 r = await self.client.post(f"{self.cfg.base_url}/chat/completions", json=body)
@@ -239,8 +239,9 @@ async def main():
     p.add_argument("--agents", type=int, default=10, help="сколько агентов работают одновременно")
     p.add_argument("--max-tokens", type=int, default=8192, help="лимит ответа агента (с размышлениями нужно больше)")
     p.add_argument("--plan-tokens", type=int, default=4096)
-    p.add_argument("--thinking", default="default", choices=["default", "off", "on", "low", "medium", "high", "xhigh"],
-                   help="режим размышлений Qwen: off — быстрее, low/medium/high — глубже (Qwen3.8)")
+    p.add_argument("--thinking", default="default", choices=["default", "off", "low", "medium", "xhigh"],
+                   help="размышления: off — быстрее всего; low/medium/xhigh — reasoning_effort Qwen3.8 "
+                        "(одинаковый для всех агентов, иначе общий префикс не переиспользуется)")
     p.add_argument("--temperature", type=float, default=None, help="по умолчанию — из generation_config модели")
     p.add_argument("--max-file-kb", type=int, default=512, help="пропускать файлы крупнее")
     p.add_argument("--timeout", type=float, default=3600)

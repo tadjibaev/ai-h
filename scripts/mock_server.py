@@ -201,18 +201,19 @@ class Handler(BaseHTTPRequestHandler):
             usage = {"prompt_tokens": prompt_tokens, "completion_tokens": n_out,
                      "total_tokens": prompt_tokens + n_out,
                      "prompt_tokens_details": {"cached_tokens": cached}}
-            pieces = [("reasoning_content" if i < n_think else "content", rng.choice(WORDS) + " ")
+            # vLLM >= 0.2x отдаёт размышления в поле "reasoning" (раньше — "reasoning_content").
+            pieces = [("reasoning" if i < n_think else "content", rng.choice(WORDS) + " ")
                       for i in range(n_out)]
             if not stream:
                 for _ in pieces:
                     time.sleep(st.per_stream_delay())
                 content = "".join(t for k, t in pieces if k == "content")
-                reasoning = "".join(t for k, t in pieces if k == "reasoning_content") or None
+                reasoning = "".join(t for k, t in pieces if k == "reasoning") or None
                 self._json(200, {"id": rid, "object": "chat.completion", "created": int(time.time()),
                                  "model": a.model, "usage": usage, "choices": [{
                                      "index": 0, "finish_reason": "length" if n_out == max_tokens else "stop",
                                      "message": {"role": "assistant", "content": content,
-                                                 "reasoning_content": reasoning}}]})
+                                                 "reasoning": reasoning}}]})
             else:
                 self._stream(rid, pieces, usage, include_usage, n_out == max_tokens)
             st.add("vllm:generation_tokens_total", n_out)
@@ -250,6 +251,11 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.flush()
 
 
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    request_queue_size = 256  # по умолчанию 5: при 10+ агентах лишние подключения ждали бы ~1 с
+
+
 def main():
     p = argparse.ArgumentParser(description="Мок OpenAI-совместимого LLM-сервера для тестов без GPU")
     p.add_argument("--host", default="127.0.0.1")
@@ -267,8 +273,7 @@ def main():
     args = p.parse_args()
 
     Handler.state = State(args)
-    srv = ThreadingHTTPServer((args.host, args.port), Handler)
-    srv.daemon_threads = True
+    srv = Server((args.host, args.port), Handler)
     print(f"mock LLM server: http://{args.host}:{args.port}/v1  model={args.model}  "
           f"(prefill {args.prefill_tps:.0f} tok/s, decode {args.decode_tps:.0f} tok/s/поток)")
     try:
