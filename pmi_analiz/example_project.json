@@ -1,0 +1,27 @@
+{
+  "id": 16108,
+  "title": "Yaponiyaning telematika texnologiyalaridan foydalangan holda … (пример по карточке портала)",
+  "country": "Япония",
+  "company": "Aioi Nissay Dowa Insurance",
+  "initiator": "Министерство экономики и финансов",
+  "region": null,
+  "cost_usd_mln": null,
+  "responsible": "Ответственный от отрасли (ФИО скрыто)",
+  "year_plan": null,
+  "created_date": "2026-01-15",
+  "steps": [
+    {"name": "Tegishli xujjatlarni imzolash (MoU)", "plan_date": "2026-01-30", "fact_date": "2026-01-30",
+     "status": "done", "documents": [{"name": "MoU.pdf", "date": "2026-01-30"}]},
+    {"name": "Dastlabki muzokaralar", "plan_date": "2026-06-30", "fact_date": "2026-06-30",
+     "status": "done", "documents": [], "photos": [{"date": "2026-06-30"}, {"date": "2026-06-30"}]},
+    {"name": "Loyihaning yakuniy …", "plan_date": "2026-12-15", "status": "in_progress"},
+    {"name": "Loyiha-smeta hujjatlarini ishlab chiqish", "plan_date": "2026-12-16", "status": "pending"},
+    {"name": "Moliyalashtirish manbalarini aniqlash", "plan_date": "2027-01-07", "status": "pending"}
+  ],
+  "messages": [
+    {"date": "2026-07-02", "from": "министерство", "text": "(пример) Просим направить протокол переговоров 30.06."},
+    {"date": "2026-07-20", "from": "инициатор", "text": "(пример) Протокол на согласовании у японской стороны."},
+    {"date": "2026-09-10", "from": "министерство", "text": "(пример) Просим сообщить сроки подготовки ПСД."},
+    {"date": "2026-09-29", "from": "инициатор", "text": "(пример) Сроки уточняются."}
+  ]
+}

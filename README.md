@@ -59,6 +59,7 @@
 | `training/eval_skills.py` | экзамен модели по навыкам и сбор обучающих примеров у модели-учителя |
 | `training/sft_lora.py`, `training/grpo_train.py` | дообучение: SFT с LoRA и обучение с подкреплением (TRL) |
 | `training/data/` | примеры задач для шести навыков и эталонные решения |
+| `pmi_analiz/analyze.py` | анализ проекта портала PMI по шагам: правила риска + тексты карточки (шаблон или своя LLM), см. [pmi_analiz/README.md](pmi_analiz/README.md) |
 
 ```bash
 pip install -r requirements.txt
